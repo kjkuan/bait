@@ -1,6 +1,81 @@
 #!/usr/bin/env bash
 #
 
+bait_show_usage () {
+    echo "
+Usage: ${0##*/} [options] <testfile>"; cat <<'EOF'
+options:
+    -n  Don't run tests.
+    -P  Don't preprocess the test file.
+    -h  Show this help.
+
+# --- FILE: t/example.t --------
+ 
+#!/usr/bin/env bait
+
+test_data1 () { local data=42; }
+test_data2 () { local data=69; }
+
+@setup test_data1
+@setup test_data2
+Case "An Example Test Case Definition" {
+    [[ $data -ge 42 ]]
+}
+
+Case "Another example with assert checks" {
+    assert (( 1 + 1 == 2 ))
+    assert { : Check if www.google.com is up
+        local url=https://www.google.com/ 
+        [[ $(curl -I -L -sf -w '%{http_code}\n' "$url" | tail -1) == 200 ]]
+    }
+}
+# -----------------------------
+
+# Run it directly
+$ chmod +x t/example.t; t/example.t
+
+# Or via prove(1)
+$ prove -ve bait t/example.t
+
+EOF
+}
+
+die() { echo "Bail out!"; echo "$@" >&2; exit 1; }
+
+main () {
+    local option
+    OPTIND=1
+    while getopts ':nPh' option "$@"; do
+        case $option in
+            n) no_run=1 ;;
+            P) no_preprocess=1 ;;
+            h) bait_show_usage; exit ;;
+            -) break ;;
+            :) die "Missing option argument for -$OPTARG" ;;
+            \?) die "Unknown option: -$OPTARG" ;;
+        esac
+    done
+    shift $((OPTIND - 1))
+
+    (( $# == 1 )) || { bait_show_usage; exit 1; }
+    set -e
+
+    local src; src=$(<"$1")
+    if [[ ! ${no_preprocess:-} ]]; then
+        src=$(_preprocess <<<"$src")
+    fi
+    if [[ ! ${no_run:-} ]]; then
+        exec "$BASH" <(
+            printf "source %q; %s\n" "$0" "$src"
+            echo "set +e; run_tests"
+        )
+    else
+        printf "%s\n" "$src"
+    fi
+}
+
+
+
 ESC=$'\e'
 C_RED=$ESC[31m
 C_GREEN=$ESC[32m
@@ -34,7 +109,6 @@ declare -gA TEST_SETUPS
 TEST_STATUS=0   # The last test run status; 0 means OK.
 
 
-die() { echo "Bail out!"; echo "$@" >&2; exit 1; }
 
 
 # Usage: `Case` `[description]`
@@ -59,7 +133,7 @@ Case () {
     if [[ ${#CASES[*]} != 0 ]]; then
         die "ERROR: Nested test cases not supported."
     fi
-    if [[ $* == *#* ]]; then
+    if [[ ${*:-} == *#* ]]; then
         die "ERROR: Sorry, '#' is not allowed in test case descriptions."
     fi
     CASES+=("$*")
@@ -262,3 +336,36 @@ _hook_up () {
 
    IFS=$'\n'; eval "${chain[*]}"; IFS=$oIFS
 }
+
+_preprocess () {
+    sed -re '
+        s/^(\s*Case(\s+.*)?)\s(\{|\()/\1; Do () \3/
+
+        s/^(\s*assert)\s+([^{]+[^;])$/\1 () { \2; }\; check/
+
+        s/^(\s*assert)\s+\{/\1 () {/
+    ' | (
+        NL=$'\n'
+        declare -gA brackets=([\{]=\} [\(]=\)); IFS=$NL
+        while read -r line; do
+            if [[ ${end_char:-} && ${line:-} == "$indent$end_char" ]]; then
+                line="${indent:-}$end_char${NL}${indent:-}End Case"
+                end_char=
+            
+            elif [[ ${line:-} =~ ^([[:space:]]*)Case([[:space:]]+|\;).+(\)|\})[[:space:]]*$ ]]; then
+                line="$line; End Case"
+
+            elif [[ ${line:-} =~ ^([[:space:]]*)Case([[:space:]]+|\;).+(\{|\()[[:space:]]*$ ]]; then
+                indent=${BASH_REMATCH[1]}
+                end_char=${brackets[${BASH_REMATCH[3]}]}
+            fi
+            echo "${line:-}"
+        done
+    )
+}
+
+if [[ $BASH_SOURCE == "$0" ]]; then
+    main "$@"
+fi
+
+

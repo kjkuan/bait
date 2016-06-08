@@ -1,38 +1,37 @@
+#!/usr/bin/env bait -n
+#
 # vim: set ft=sh:
 
-source bait.sh
-
-Case; Do () {
+Case {
     : An empty test case without description.
 }
-End Case
 
-Case "A simple test case that suceeds"; Do () { true; }; End Case
-Case "A simple test case that fails"; Do () { echo "# This will fail"; false; }; End Case
-Case "A test case is just a function"; Do () { declare -f Test_4; }; End Case
+Case "A simple test case that suceeds" { true; }
+Case "A simple test case that fails" { echo "# This will fail"; false; }
+Case "A test case is just a function" { declare -f Test_4; }
 
-Case "A test case with a few checks"; Do () {
-    assert () { (( 2 > 1 && 1 + 1 == 2 )); }; check
+Case "A test case with a few checks" {
+    assert (( 2 > 1 && 1 + 1 == 2 ))
 
     local greeting="hello world"
-    assert () { [[ "$greeting" == "hello world" ]]; }; check
+    assert [[ "$greeting" == "hello world" ]]
 
-    assert () { : a failing assert; false; }; check
+    assert : a failing assert; false
 
-    assert () { date; }; check
+    assert date
 
-    Case; Do () { echo "Nested test case won't be run"; }; End Case
+    Case { echo "Nested test case won't be run"; } 
 }
-End Case
 
-Case "Test the SKIP directive"; Do () { SKIP "skipping..."; return; false; }; End Case
-Case "Test the TODO directive"; Do () { TODO "still a work in progress..."; false; }; End Case
+
+Case "Test the SKIP directive" { SKIP "skipping..."; return; false; } 
+Case "Test the TODO directive" { TODO "still a work in progress..."; false; } 
 
 pid=$$
-Case "A test case that runs in a subshell"; Do () (
-    assert () { [[ $BASHPID != "$pid" ]]; }; check
+Case "A test case that runs in a subshell" (
+    assert [[ $BASHPID != "$pid" ]]
 )
-End Case
+
 
 my_fixture() {
     local data=abc123
@@ -44,11 +43,11 @@ test_data() {
 }
 
 @setup my_fixture test_data
-Case "Testing fixtures..."; Do () {
-    assert () {  [[ $data == abc123 ]]; }; check
-    assert () {  [[ $data2 == abc123xyz ]]; }; check
+Case "Testing fixtures..." {
+    assert [[ $data == abc123 ]]
+    assert [[ $data2 == abc123xyz ]]
 }
-End Case
+
 
 test_data2 () { 
     local line1 line2 line3
@@ -61,21 +60,18 @@ test_data2 () {
     )
 
 @setup test_data2
-Case "Test case using fixture and redirection"; Do () {
-    assert () {
+Case "Test case using fixture and redirection" {
+    assert {
         [[ $line1 = line1 && $line2 = line2 && $line3 = line3 ]]
     }; check
 }
-End Case
+
 
 fixture1() { local data=fixture1data; }
 fixture2() { local data=fixture2data; }
 
 @setup fixture1
 @setup fixture2
-Case "Test multiple fixture setups"; Do () {
+Case "Test multiple fixture setups" {
     [[ $data == fixture?data ]]
 }
-End Case
-
-run_tests
