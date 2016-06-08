@@ -10,6 +10,13 @@ and like how it has turned out so far. I hope it might be useful to you.
 
 Suggestions, bug reports, or pull requests are most welcomed!
 
+> *NOTE*: This is still a work in progress..., and it's not recommended for production use!
+          In particular, by default(can be turned off with `-P`), Bait preprocesses
+          the test file, so there are some conventions(undocumented) on how you must format
+          your `Case` and `assert` blocks, and Bait may not get everything preprocessed
+          correctly yet!
+
+
 ```bash
 # --- FILE: t/example.t --------
 #!/usr/bin/env bait
@@ -25,7 +32,8 @@ Case "An Example Test Case Definition" {
 
 Case "Another example with assert checks" {
     assert (( 1 + 1 == 2 ))
-    assert { : Check if www.google.com is up
+    assert {
+        : Check if www.google.com is up
         local url=https://www.google.com/ 
         [[ $(curl -I -L -sf -w '%{http_code}\n' "$url" | tail -1) == 200 ]]
     }
@@ -56,9 +64,17 @@ ok 3 - Another example with assert checks
 + assert
 + ((  1 + 1 == 2  ))
 + local rc=0
++ check
++ assert
++ : Check if www.google.com is up
++ local url=https://www.google.com/
+++ curl -I -L -sf -w '%{http_code}\n' https://www.google.com/
+++ tail -1
++ [[ 200 == 200 ]]
++ local rc=0
 ok
 All tests successful.
-Files=1, Tests=3,  0 wallclock secs ( 0.02 usr  0.00 sys +  0.01 cusr  0.01 csys =  0.04 CPU)
+Files=1, Tests=3,  1 wallclock secs ( 0.01 usr  0.00 sys +  0.04 cusr  0.02 csys =  0.07 CPU)
 Result: PASS
 ```
 
