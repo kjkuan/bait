@@ -24,7 +24,7 @@ Case "A test case with a few checks" {
 }
 
 
-Case "Test the SKIP directive" { SKIP "skipping..."; return; false; } 
+Case "Test the SKIP directive" { SKIP "skipping..."; false; }
 Case "Test the TODO directive" { TODO "still a work in progress..."; false; } 
 
 pid=$$

@@ -201,10 +201,41 @@ check () {
 # the test case level.
 #
 
-# Mark the test case as one to be skipped.
-# This command must be used together with a `return` statement.
+# Usage 1: SKIP [reason]
+# Usage 2: SKIP <levels>
+# Usage 3: SKIP <reason> <levels>
 #
-SKIP () { CASE_STATE=SKIP; STATE_REASON=$*; }
+# If used inside a loop, then you must specify the correct `level`,
+# which is the number of enclosing loops in the call chain up to the
+# enclosing test case function, to skip. 
+#
+# If `0` is specified for `level` then `SKIP` will mark the test case
+# as skipped and then return to the test case. It is then up to you
+# to decide whether to `return` or continue the test case.
+#
+# The following examples all skip the containing test cases:
+#
+#     Case; Do () { SKIP; }; End Case
+#     Case; Do () { SKIP "reason..."; }; End Case
+#     Case; Do () { while true; do SKIP 1; done; }; End Case
+#     Case; Do () { while true; do SKIP "reason..." 1; done; }; End Case
+#     Case; Do () { while true; do while true; do SKIP "reason..." 2; done; done; }; End Case
+#     Case; Do () { while true; do while true; do SKIP 0; return; done; done; }; End Case
+#     Case; Do () { while true; do while true; do SKIP "reason..." 0; return; done; done; }; End Case
+#
+SKIP () {
+    CASE_STATE=SKIP
+    if [[ ${!#} =~ ^[1-9][0-9]*$ ]]; then
+        STATE_REASON=${@:1:$#-1}
+        break $(( ${!#} + 1 ))
+
+    elif [[ ${!#} != 0 ]]; then
+        STATE_REASON=$*
+        break
+    fi
+    # i.e., we have: SKIP [...] 0
+    STATE_REASON=${@:1:$#-1}
+}
 
 # Mark the test case as todo, and as such, this test
 # result will won't count towards the final results.
@@ -271,10 +302,12 @@ run_tests () {
         fi
 
         CASE_STATE=; STATE_REASON=; TEST_STATUS=0
-
-        set -x
-        $target; TEST_STATUS=$(($TEST_STATUS || $?))
-        set +x
+        local only
+        for only in once; do  # for SKIP to break out of.
+            set -x
+            $target; TEST_STATUS=$(($TEST_STATUS || $?))
+            set +x
+        done
 
         directive=${CASE_STATE:+" # $CASE_STATE${STATE_REASON:+" $STATE_REASON"}"}
         echo "${OK[$TEST_STATUS]:-$NOT_OK} ${test_func##*_} - $case_desc$directive"
@@ -338,7 +371,7 @@ _hook_up () {
 }
 
 
-_preprocess () { #FIXME: review the regexes
+_preprocess () {
     sed -re '
         s/^(\s*Case(\s+.*)?)\s(\{|\()/\1; Do () \3/
 
@@ -357,13 +390,16 @@ _preprocess () { #FIXME: review the regexes
                 line="${indent:-}$end_char${NL}${indent:-}End Case"
                 end_char=
             
+            # single line: Case ...; Do () { .... }
             elif [[ ${line:-} =~ ^([[:space:]]*)Case([[:space:]]+|\;).+(\)|\})[[:space:]]*$ ]]; then
                 line="$line; End Case"
 
+            # multi-line Case block
             elif [[ ${line:-} =~ ^([[:space:]]*)Case([[:space:]]+|\;).+(\{|\()[[:space:]]*$ ]]; then
                 indent=${BASH_REMATCH[1]}
                 end_char=${brackets[${BASH_REMATCH[3]}]}
 
+            # multi-line assert block
             elif [[ ${line:-} =~ ^([[:space:]]*)assert([[:space:]]+|\().+\{[[:space:]]*$ ]]; then
                 found_assert=1
                 assert_indent=${BASH_REMATCH[1]}
