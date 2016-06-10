@@ -19,7 +19,7 @@ Suggestions, bug reports, or pull requests are most welcomed!
 
 What does it look like?
 ==========================
-```
+```bash
 # --- FILE: t/example.t --------
 #!/usr/bin/env bait
 
