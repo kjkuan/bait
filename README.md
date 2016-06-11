@@ -1,20 +1,12 @@
 What is it?
 =============
-Bait is a small test framework in Bash.
+Bait(Bash Automated Integration Test) is a small test framework in Bash.
 
-It produces TAP style test outputs, and unlike most of the test tools in Bash,
-it doesn't require you to run every test in its own subprocess.
-
-I'm not sure what it might be good for yet, but I had fun implementing it
-and like how it has turned out so far. I hope it might be useful to you.
+It produces [TAP](http://testanything.org) style test outputs, and unlike most
+of the test tools in Bash, it doesn't require you to run every test in its own
+subprocess.
 
 Suggestions, bug reports, or pull requests are most welcomed!
-
-> *NOTE*: This is still a work in progress..., and it's not recommended for production use!
-          In particular, by default(can be turned off with `-P`), Bait preprocesses
-          the test file, so there are some conventions(undocumented) on how you must format
-          your `Case` and `assert` blocks, and Bait may not get everything preprocessed
-          correctly yet!
 
 
 What does it look like?
@@ -130,8 +122,8 @@ provides a `check` function do help you do that. Example:
 
 Basically, you define an `assert()` function containing your check logic,
 and then you call `check` immediately after the functinon definition.
-The above example will result in a failed test case when it's run because the
-second assert check fails.
+The above example will run all three checks and result in a failed test case when
+because the second assert check fails.
 
 The advantage of defining your check in an `assert()` function like this is that
 you can put anything in it easily without messing with quotes. Plus, when a check
@@ -139,7 +131,26 @@ fails, Bait will show the source code of its `assert()` function for you to see.
 
 Using SKIP and TODO
 ----------------------
-FIXME
+In your test case function, you can use the `SKIP` command to skip the test case.
+Example:
+
+    Case "Skipping a Test"; Do () {
+        echo "About to skip this test case..."
+        SKIP "you can provide a reason here..., it's optional."
+        echo "Execution won't reach here."
+    }
+    End Case
+    
+However, when using `SKIP` in a loop directly or indirectly, you need to specify
+an extra integer argument for it. See [here](bait#L206) for more details.
+
+Similarly, you can also mark a test case as TODO, using the `TODO` command.
+Example:
+
+    Case "Test someting"; Do () { TODO; }; End Case
+
+NOTE: Unlike `SKIP`, `TODO` won't change the execution flow
+
 
 Preprocessing
 -----------------
@@ -221,15 +232,60 @@ However, in practice, this is usually not a problem if you have set up auto-inde
 
 Defining and Using Test Fixtures
 ==================================
-FIXME
+A test fixture is a function that prepares the test data(in the form of local or
+global variables), or external resources(e.g., files or database) to be used by
+other test cases. For example:
+
+    my_series() {
+        local series=(2 3 5 7 11 13 17)
+    }
+    
+    @setup my_series
+    Case "Sum of the series must be greater than 42" {
+        local i sum=0
+        for i in ${series[*]}; do
+            (( sum += i ))
+        done
+        (( sum > 42 ))
+    }
+
+You use `@setup` to "decorate" a test case with the fixture functions it needs,
+and Bait will take care of setting up the call chain so that the test data
+set up by the fixtures will be available to your test case function.
+
+Notice that in the test case, it's using `series`, which is a local variable
+in the fixture. This is possible because of [dynamic scoping] in Bash.
+
+You can chain multiple fixtures with `@setup fixture1 fixture2 ...`, and Bait will
+call your test case function like this: `fixture1 -> fixture2 -> ... -> test case`.
+This also means local variables in `fixture1` will be available in `fixture2`, and
+local variables in `fixture2` will be available in `fixture3`, and so on..., and
+all of them will be available in your test case.
+
+You can also decorate your test case with multiple `@setup` chains, and Bait will
+create one test case for each chain. This could be useful when you have a test
+case, but need it to be run with different test data setups, for example.
+
+[dynamic scoping]: https://en.wikipedia.org/wiki/Dynamic_scoping#Dynamic_scoping
 
 
 Running Tests
 ===============
-
 You can define as many test cases as you want, and you can put them in
-different files organized under different directories.
+different files organized under different directories. 
 
+To run your test cases with Bait, first make sure the `bait` script is in your
+`PATH`. One way to run a test script is to make your test script self-executable
+by using the `#!/usr/bin/env bait` shebang line, `chmod +x` the script, and then
+just run it.
 
+If you have many test scripts, another way to run them is to use the `prove`
+utility, which comes with perl so you probably already have it installed. It should
+be invoked with `-e bait`, for example:
+
+    # Run all test cases under the t/ directory
+    $ prove -e bait
+
+See `prove` man page for more details.
 
 

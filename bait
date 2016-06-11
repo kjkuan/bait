@@ -40,9 +40,9 @@ $ prove -ve bait t/example.t
 EOF
 }
 
-die() { echo "Bail out!"; echo "$@" >&2; exit 1; }
+bait_die() { echo "Bail out!"; echo "$@" >&2; exit 1; }
 
-main () {
+bait_main () {
     local option
     OPTIND=1
     while getopts ':nPh' option "$@"; do
@@ -51,8 +51,8 @@ main () {
             P) no_preprocess=1 ;;
             h) bait_show_usage; exit ;;
             -) break ;;
-            :) die "Missing option argument for -$OPTARG" ;;
-            \?) die "Unknown option: -$OPTARG" ;;
+            :) bait_die "Missing option argument for -$OPTARG" ;;
+            \?) bait_die "Unknown option: -$OPTARG" ;;
         esac
     done
     shift $((OPTIND - 1))
@@ -67,7 +67,7 @@ main () {
     if [[ ! ${no_run:-} ]]; then
         exec "$BASH" <(
             printf "source %q; %s\n" "$0" "$src"
-            echo "set +e; run_tests"
+            echo "set +e; bait_run_tests"
         )
     else
         printf "%s\n" "$src"
@@ -131,10 +131,10 @@ TEST_STATUS=0   # The last test run status; 0 means OK.
 #
 Case () {
     if [[ ${#CASES[*]} != 0 ]]; then
-        die "ERROR: Nested test cases not supported."
+        bait_die "ERROR: Nested test cases not supported."
     fi
     if [[ ${*:-} == *#* ]]; then
-        die "ERROR: Sorry, '#' is not allowed in test case descriptions."
+        bait_die "ERROR: Sorry, '#' is not allowed in test case descriptions."
     fi
     CASES+=("$*")
 }
@@ -151,14 +151,14 @@ Case () {
 #
 End () {
     if [[ ${#CASES[*]} -eq 0 ]]; then
-        die "ERROR: No matching 'Case' command!"
+        bait_die "ERROR: No matching 'Case' command!"
     fi
     if (( ! ${#SETUPS[*]} )); then
         SETUPS+=("")
     fi
 
     local fbody; fbody=$(declare -f Do | sed 1d)
-    [[ ${fbody:-} ]] || die "ERROR: No matching 'Do' definition!"
+    [[ ${fbody:-} ]] || bait_die "ERROR: No matching 'Do' definition!"
     unset -f Do
 
     local desc=${CASES[-1]}; unset 'CASES[-1]'
@@ -283,7 +283,7 @@ TODO () { CASE_STATE=TODO; STATE_REASON=$*; }
 
 # Run the test cases, producing TAP style outputs.
 #
-run_tests () {
+bait_run_tests () {
     local test_func target case_desc setups directive
 
     echo 1..${#TESTS[*]}
@@ -410,7 +410,7 @@ _preprocess () {
 }
 
 if [[ $BASH_SOURCE == "$0" ]]; then
-    main "$@"
+    bait_main "$@"
 fi
 
 
