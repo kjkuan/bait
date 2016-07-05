@@ -203,14 +203,14 @@ End Case
 <tr>
   <td>
 <pre>
-assert {
+assert "..." {
     ...
 }
 </pre>
   </td>
   <td>
 <pre>
-assert () {
+assert () { : "..."
     ...
 }
 check
@@ -224,9 +224,8 @@ One caveat with preprocessing is that it can't 100% get it right in all cases. P
 it requires you to indent your closing `}` or `)` correctly to match the starting `Case` or `assert`.
 However, in practice, this is usually not a problem if you have set up auto-indent in your text editor.
 
-> **NOTE**: Preprocessing can be turned off via the `-P` command line option to Bait. Together with
-            the `-n` (don't run tests) option, you will be able to see how Bait preprocessed your
-            test script.
+> **NOTE**: With the `-n` (don't run tests) option, you can see how Bait preprocessed your
+            test script. Preprocessing can be turned off via the `-P` option.
 
 
 

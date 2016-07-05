@@ -375,12 +375,11 @@ _preprocess () {
     sed -re '
         s/^(\s*Case(\s+.*)?)\s(\{|\()/\1; Do () \3/
 
-        s/^(\s*assert)\s+([^{]+[^;])\s*$/\1 () { \2; }\; check/
+        s/^(\s*assert)\s+(.*[^;{])\s*$/\1 () { \2; }; check/
 
-        s/^(\s*assert)\s+\{/\1 () {/
+        s/^(\s*assert)\s+(.*)\s*\{\s*$/\1 () { : \2/
     ' | (
-        NL=$'\n'
-        declare -gA brackets=([\{]=\} [\(]=\)); IFS=$NL
+        declare -gA brackets=([\{]=\} [\(]=\)); NL=$'\n' IFS=$NL
         while read -r line; do
             if [[ ${found_assert:-} && ${line:-} == "${assert_indent:-}}"* ]]; then
                 line="${assert_indent:-}}${NL}${assert_indent:-}check"
@@ -400,7 +399,7 @@ _preprocess () {
                 end_char=${brackets[${BASH_REMATCH[3]}]}
 
             # multi-line assert block
-            elif [[ ${line:-} =~ ^([[:space:]]*)assert([[:space:]]+|\().+\{[[:space:]]*$ ]]; then
+            elif [[ ${line:-} =~ ^([[:space:]]*)assert([[:space:]]+|\().+\{\ :.*$ ]]; then
                 found_assert=1
                 assert_indent=${BASH_REMATCH[1]}
             fi

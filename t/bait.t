@@ -20,6 +20,10 @@ Case "A test case with a few checks" {
 
     assert date
 
+    assert "a description for the assertion" {
+        (( 24 < 42 ))
+    }
+
     Case { echo "Nested test case won't be run"; } 
 }
 
