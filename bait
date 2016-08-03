@@ -187,7 +187,7 @@ End () {
 #
 #     assert () { (( 1 + 1 == 2 )); }; check
 #
-check () {
+check () { : "$C_YELLOW--------------------------------------------------------------------------------"
     assert; local rc=$?
     set +x
     if [[ $rc -ne 0 ]]; then
@@ -373,18 +373,17 @@ _hook_up () {
 
 
 _preprocess () {
-    local mark="$C_YELLOW--------------------------------------------------------------------------------"
     sed -re "
         s/^(\s*Case(\s+.*)?)\s(\{|\()/\1; Do () \3/
 
-        s/^(\s*assert)\s+(.*[^;{])\s*$/\1 () { \2; }; check $mark/
+        s/^(\s*assert)\s+(.*[^;{])\s*$/\1 () { \2; }; check/
 
         s/^(\s*assert)\s+(.*)\s*\{\s*$/\1 () { : \2/
     " | (
         declare -gA brackets=([\{]=\} [\(]=\)); NL=$'\n' IFS=$NL
         while read -r line; do
             if [[ ${found_assert:-} && ${line:-} == "${assert_indent:-}}"* ]]; then
-                line="${assert_indent:-}}${NL}${assert_indent:-}check $mark"
+                line="${assert_indent:-}}${NL}${assert_indent:-}check"
                 found_assert=
 
             elif [[ ${end_char:-} && ${line:-} == "$indent$end_char" ]]; then
