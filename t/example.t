@@ -11,8 +11,7 @@ Case "An Example Test Case Definition" {
 
 Case "Another example with assert checks" {
     assert (( 1 + 1 == 2 ))
-    assert {
-        : Check if www.google.com is up
+    assert "Check if www.google.com is up" {
         local url=https://www.google.com/ 
         [[ $(curl -I -L -sf -w '%{http_code}\n' "$url" | tail -1) == 200 ]]
     }

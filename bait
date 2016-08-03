@@ -24,7 +24,7 @@ Case "An Example Test Case Definition" {
 
 Case "Another example with assert checks" {
     assert (( 1 + 1 == 2 ))
-    assert { : Check if www.google.com is up
+    assert "Check if www.google.com is up" {
         local url=https://www.google.com/ 
         [[ $(curl -I -L -sf -w '%{http_code}\n' "$url" | tail -1) == 200 ]]
     }
@@ -191,8 +191,9 @@ check () {
     assert; local rc=$?
     set +x
     if [[ $rc -ne 0 ]]; then
-        echo "$C_RED$(declare -f assert)$C_OFF" >&2
+        echo "$C_RED$(declare -f assert)" >&2
     fi
+    echo "$C_OFF" >&2
     TEST_STATUS=$(($TEST_STATUS || $rc))
     set -x
 }
@@ -238,7 +239,7 @@ SKIP () {
 }
 
 # Mark the test case as todo, and as such, this test
-# result will won't count towards the final results.
+# result won't count towards the final results.
 #
 TODO () { CASE_STATE=TODO; STATE_REASON=$*; }
 
@@ -372,17 +373,18 @@ _hook_up () {
 
 
 _preprocess () {
-    sed -re '
+    local mark="$C_YELLOW--------------------------------------------------------------------------------"
+    sed -re "
         s/^(\s*Case(\s+.*)?)\s(\{|\()/\1; Do () \3/
 
-        s/^(\s*assert)\s+(.*[^;{])\s*$/\1 () { \2; }; check/
+        s/^(\s*assert)\s+(.*[^;{])\s*$/\1 () { \2; }; check $mark/
 
         s/^(\s*assert)\s+(.*)\s*\{\s*$/\1 () { : \2/
-    ' | (
+    " | (
         declare -gA brackets=([\{]=\} [\(]=\)); NL=$'\n' IFS=$NL
         while read -r line; do
             if [[ ${found_assert:-} && ${line:-} == "${assert_indent:-}}"* ]]; then
-                line="${assert_indent:-}}${NL}${assert_indent:-}check"
+                line="${assert_indent:-}}${NL}${assert_indent:-}check $mark"
                 found_assert=
 
             elif [[ ${end_char:-} && ${line:-} == "$indent$end_char" ]]; then
@@ -411,5 +413,3 @@ _preprocess () {
 if [[ $BASH_SOURCE == "$0" ]]; then
     bait_main "$@"
 fi
-
-
