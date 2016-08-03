@@ -225,6 +225,7 @@ check () { : "$C_YELLOW---------------------------------------------------------
 #     Case; Do () { while true; do while true; do SKIP "reason..." 0; return; done; done; }; End Case
 #
 SKIP () {
+    set +x
     CASE_STATE=SKIP
     if [[ ${!#} =~ ^[1-9][0-9]*$ ]]; then
         STATE_REASON=${@:1:$#-1}
@@ -241,7 +242,11 @@ SKIP () {
 # Mark the test case as todo, and as such, this test
 # result won't count towards the final results.
 #
-TODO () { CASE_STATE=TODO; STATE_REASON=$*; }
+TODO () {
+    set +x
+    CASE_STATE=TODO; STATE_REASON=$*
+    set -x
+}
 
 
 # Specify a list of setup functions for its following test case.
@@ -307,8 +312,8 @@ bait_run_tests () {
         for only in once; do  # for SKIP to break out of.
             set -x
             $target; TEST_STATUS=$(($TEST_STATUS || $?))
-            set +x
         done
+        set +x
 
         directive=${CASE_STATE:+" # $CASE_STATE${STATE_REASON:+" $STATE_REASON"}"}
         echo "${OK[$TEST_STATUS]:-$NOT_OK} ${test_func##*_} - $case_desc$directive"
