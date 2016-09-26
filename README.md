@@ -111,7 +111,7 @@ values indicate failure.
 Using assert-checks
 ---------------------
 Sometimes you'd like to perform several checks in one test case. Bait
-provides a `check` function do help you do that. Example:
+provides a `check` function to help you do that. Example:
 
     Case "An assert-check example"; Do () {
         assert () { true; }; check
@@ -122,7 +122,7 @@ provides a `check` function do help you do that. Example:
 
 Basically, you define an `assert()` function containing your check logic,
 and then you call `check` immediately after the functinon definition.
-The above example will run all three checks and result in a failed test case when
+The above example will run all three checks and result in a failed test case
 because the second assert check fails.
 
 The advantage of defining your check in an `assert()` function like this is that

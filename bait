@@ -328,7 +328,7 @@ bait_run_tests () {
             unset 'setups[-1]'
         done
     done
-} 2> >(sed '/^++* set +x$/d; /^++* TEST_STATUS=/d')
+} 2> >(sed '/^++* set +x$/d; /^++* TEST_STATUS=/d' >&2)
 
 
 
@@ -391,7 +391,7 @@ _preprocess () {
                 line="${assert_indent:-}}${NL}${assert_indent:-}check"
                 found_assert=
 
-            elif [[ ${end_char:-} && ${line:-} == "$indent$end_char" ]]; then
+            elif [[ ${end_char:-} && ${line:-} == "$indent$end_char"* ]]; then
                 line="${indent:-}$end_char${NL}${indent:-}End Case"
                 end_char=
             
