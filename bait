@@ -315,6 +315,7 @@ bait_run_tests () {
         set +x
 
         directive=${CASE_STATE:+" # $CASE_STATE${STATE_REASON:+" $STATE_REASON"}"}
+        echo
         echo "${OK[$TEST_STATUS]:-$NOT_OK} ${test_func##*_} - $case_desc$directive"
 
         local setup_func
