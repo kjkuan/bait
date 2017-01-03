@@ -41,7 +41,7 @@ $ prove -ve bait t/example.t
 EOF
 }
 
-bait_die() { echo "Bail out!"; echo "$@" >&2; exit 1; }
+bait_die() { echo; echo "Bail out!"; echo "$@" >&2; exit 1; }
 
 bait_main () {
     local option
