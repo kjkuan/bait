@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #
+BASH_COMPAT=4.3   # for SKIP(uses break outside of loops) to work.
 
 bait_show_usage () {
     echo "
@@ -58,7 +59,7 @@ bait_main () {
     shift $((OPTIND - 1))
 
     (( $# == 1 )) || { bait_show_usage; exit 1; }
-    set -e
+    local -; set -e
 
     local src; src=$(<"$1")
     if [[ ! ${no_preprocess:-} ]]; then
@@ -189,13 +190,12 @@ End () {
 #
 check () { : "$C_YELLOW--------------------------------------------------------------------------------"
     assert; local rc=$?
-    set +x
+    local -; set +x
     if [[ $rc -ne 0 ]]; then
         echo "$C_RED$(declare -f assert)" >&2
     fi
     echo "$C_OFF" >&2
     TEST_STATUS=$(($TEST_STATUS || $rc))
-    set -x
 }
 
 # Test result directives. These should only be used at
@@ -225,7 +225,7 @@ check () { : "$C_YELLOW---------------------------------------------------------
 #     Case; Do () { while true; do while true; do SKIP "reason..." 0; return; done; done; }; End Case
 #
 SKIP () {
-    set +x
+    local -; set +x
     CASE_STATE=SKIP
     if [[ ${!#} =~ ^[1-9][0-9]*$ ]]; then
         STATE_REASON=${@:1:$#-1}
@@ -243,9 +243,8 @@ SKIP () {
 # result won't count towards the final results.
 #
 TODO () {
-    set +x
+    local -; set +x
     CASE_STATE=TODO; STATE_REASON=$*
-    set -x
 }
 
 
@@ -308,7 +307,7 @@ bait_run_tests () {
         fi
 
         CASE_STATE=; STATE_REASON=; TEST_STATUS=0
-        local only
+        local only -
         for only in once; do  # for SKIP to break out of.
             set -x
             $target; TEST_STATUS=$(($TEST_STATUS || $?))
