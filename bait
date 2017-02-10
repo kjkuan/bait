@@ -368,7 +368,7 @@ _hook_up () {
             fi
             lines+=("$last")
             src1=${lines[*]}
-            IFS=$oIFS; set -$opts
+            IFS=$oIFS; set +f; set -$opts
         fi
         chain+=("$src1")
    done
