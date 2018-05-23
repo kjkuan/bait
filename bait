@@ -3,12 +3,15 @@
 BASH_COMPAT=4.3   # for SKIP(uses break outside of loops) to work.
 
 bait_show_usage () {
-    echo "
-Usage: ${0##*/} [options] <testfile>"; cat <<'EOF'
+    echo "Usage: ${0##*/} -h or ${0##*/} <testfile> [options] "; cat <<'EOF'
 options:
-    -n  Don't run tests.
-    -P  Don't preprocess the test file.
-    -h  Show this help.
+    -n          Don't run tests.
+    -P          Don't preprocess the test file.
+    -t CASES    A list of comma separated test case numbers to run.
+    -T CASES    A list of comma separated test case numbers to skip.
+    -i PATTERN  Run only the test cases whose description matches the glob PATTERN.
+    -x PATTERN  Skip any test cases whose description matches the glob PATTERN.
+    -C          No colors.
 
 # --- FILE: t/example.t --------
  
@@ -44,12 +47,22 @@ EOF
 bait_die() { echo; echo "Bail out!"; echo "$@" >&2; exit 1; }
 
 bait_main () {
-    local option
+    if [[ $1 = -h ]]; then bait_show_usage; exit 0; fi
+
+    local -; set -e
+    local src; src=$(<"${1:?required}"); shift
+
+    local option no_run no_preprocess 
     OPTIND=1
-    while getopts ':nPh' option "$@"; do
+    while getopts ':nPt:T:i:x:Ch' option "$@"; do
         case $option in
             n) no_run=1 ;;
             P) no_preprocess=1 ;;
+            t) export BAIT_INCLUDE_TESTS=$OPTARG ;;
+            T) export BAIT_EXCLUDE_TESTS=$OPTARG ;;
+            i) export BAIT_INCLUDE_PATTERN=$OPTARG ;;
+            x) export BAIT_EXCLUDE_PATTERN=$OPTARG ;;
+            C) export BAIT_NO_COLORS=1 ;;
             h) bait_show_usage; exit ;;
             -) break ;;
             :) bait_die "Missing option argument for -$OPTARG" ;;
@@ -57,11 +70,9 @@ bait_main () {
         esac
     done
     shift $((OPTIND - 1))
+    (( $# == 0 )) || { bait_show_usage; exit 1; }
 
-    (( $# == 1 )) || { bait_show_usage; exit 1; }
-    local -; set -e
 
-    local src; src=$(<"$1")
     if [[ ! ${no_preprocess:-} ]]; then
         src=$(_preprocess <<<"$src")
     fi
@@ -96,7 +107,7 @@ CASE_STATE=;    # SKIP or TODO.
 STATE_REASON=;  # reason for the above state.
 
 TESTS=()        # A list of test case function names accumulated so far.
-                # These are candidates for run_test().
+                # These are candidates for bait_run_tests().
 
 
 # Accumulate each `@setup` call's arguments for the current defining
@@ -109,6 +120,8 @@ declare -gA TEST_SETUPS
 
 TEST_STATUS=0   # The last test run status; 0 means OK.
 
+# Temporary directory to capture test output; initialized before running tests.
+TEST_OUTPUT_DIR=
 
 
 
@@ -188,14 +201,24 @@ End () {
 #
 #     assert () { (( 1 + 1 == 2 )); }; check
 #
-check () { : "$C_YELLOW--------------------------------------------------------------------------------"
-    assert; local rc=$?
-    local -; set +x
-    if [[ $rc -ne 0 ]]; then
-        echo "$C_RED$(declare -f assert)" >&2
-    fi
-    echo "$C_OFF" >&2
-    TEST_STATUS=$(($TEST_STATUS || $rc))
+check () {
+    local out=$TEST_OUTPUT_DIR/${FUNCNAME[1]}.asserts stderr
+    local return_code color
+
+    exec {stderr}>&2 2>>$out
+    echo "$(declare -f assert)" >&2
+
+    if [[ $BAIT_NO_COLORS ]]; then color=''; else color=$C_RED; fi
+    echo "$color" >&2
+    set -x
+    assert; return_code=$?
+    set +x
+    if [[ $BAIT_NO_COLORS ]]; then color=''; else color=$C_OFF; fi
+    echo "$color" >&2
+
+    eval exec "2>&$stderr $stderr>&-"
+
+    TEST_STATUS=$(($TEST_STATUS || $return_code))
 }
 
 # Test result directives. These should only be used at
@@ -243,7 +266,6 @@ SKIP () {
 # result won't count towards the final results.
 #
 TODO () {
-    local -; set +x
     CASE_STATE=TODO; STATE_REASON=$*
 }
 
@@ -289,16 +311,28 @@ TODO () {
 # Run the test cases, producing TAP style outputs.
 #
 bait_run_tests () {
-    local test_func target case_desc setups directive
+    TEST_OUTPUT_DIR=$(mktemp -d tmp.XXXXXXXXXXXX) && 
+        trap "rm -rf $(printf "%q\n" "$TEST_OUTPUT_DIR")" EXIT \
+        || bait_die "Failed creating need temporary directory!"
+
+    local test_func test_num case_desc target failed_tests=()
+
+    __set_case_desc () {
+        case_desc=${CASE_DESCRIPTIONS[$test_func]}
+        case_desc=${case_desc:+ - $case_desc}
+    }
+    __skip_test_func () {
+        once=; CASE_STATE=SKIP
+        STATE_REASON="user directed skip at CLI"
+    }
 
     echo 1..${#TESTS[*]}
 
     for test_func in "${TESTS[@]}"; do
+        test_num=${test_func##*_}
+        __set_case_desc
 
-        case_desc=${CASE_DESCRIPTIONS[$test_func]}
-        echo "${C_CYAN}---$test_func: $case_desc $C_OFF" >&2
-
-        setups=(${TEST_SETUPS[$test_func]:-})
+        local setups=(${TEST_SETUPS[$test_func]:-})
         if (( ${#setups[*]} )); then
             _hook_up ${setups[*]} $test_func
             target=${setups%% *}_hooked
@@ -306,17 +340,36 @@ bait_run_tests () {
             target=$test_func
         fi
 
-        CASE_STATE=; STATE_REASON=; TEST_STATUS=0
-        local only -
-        for only in once; do  # for SKIP to break out of.
-            set -x
-            $target; TEST_STATUS=$(($TEST_STATUS || $?))
-        done
-        set +x
+        local only once=1
+        CASE_STATE=; STATE_REASON=; TEST_STATUS=0; 
 
-        directive=${CASE_STATE:+" # $CASE_STATE${STATE_REASON:+" $STATE_REASON"}"}
+        [[ ${BAIT_INCLUDE_TESTS:-} ]] && {
+            [[ ,$BAIT_INCLUDE_TESTS, == *,$test_num,* ]] || __skip_test_func
+        }
+        [[ ${BAIT_EXCLUDE_TESTS:-} ]] && {
+            [[ ,$BAIT_EXCLUDE_TESTS, != *,$test_num,* ]] || __skip_test_func
+        }
+        [[ ${BAIT_INCLUDE_PATTERN:-} ]] && {
+            [[ $case_desc == $BAIT_INCLUDE_PATTERN ]]    || __skip_test_func
+        }
+        [[ ${BAIT_EXCLUDE_PATTERN:-} ]] && {
+            [[ $case_desc != $BAIT_EXCLUDE_PATTERN ]]    || __skip_test_func
+        }
+
+        for only in $once; do  # for SKIP to break out of.
+            local stdout=$TEST_OUTPUT_DIR/$test_func.out
+            local stderr=$TEST_OUTPUT_DIR/$test_func.err
+            $target >"$stdout" 2>"$stderr"
+            TEST_STATUS=$(($TEST_STATUS || $?))
+        done
+
+        if [[ $TEST_STATUS -ne 0 ]]; then
+            failed_tests+=($test_func)
+        fi
+
+        local directive=${CASE_STATE:+" # $CASE_STATE${STATE_REASON:+" $STATE_REASON"}"}
+        echo "${OK[$TEST_STATUS]:-$NOT_OK} $test_num$case_desc$directive"
         echo
-        echo "${OK[$TEST_STATUS]:-$NOT_OK} ${test_func##*_} - $case_desc$directive"
 
         local setup_func
         while (( ${#setups[*]} )); do
@@ -328,7 +381,32 @@ bait_run_tests () {
             unset 'setups[-1]'
         done
     done
-} 2> >(sed '/^++* set +x$/d; /^++* TEST_STATUS=/d' >&2)
+
+    local c_off
+    for test_func in  "${failed_tests[@]}"; do
+        __set_case_desc
+        echo
+        echo =========================================
+        echo "Failed $test_func$case_desc"
+        echo "--- Failed asserts ---------------------"
+        if [[ -e "$TEST_OUTPUT_DIR/$test_func.asserts" ]]; then
+            if [[ $BAIT_NO_COLORS ]]; then c_off=''; else c_off=$C_OFF; fi
+            awk -v C_OFF=$c_off '
+                 /^assert \(\)/,/^\+ return_code=[0-9]+/ { lines[i++]=$0     }
+                 /^\+ return_code=0/                     { delete lines; i=0 }
+                 /^\+ return_code=[^0]/                  { for (j=0; j < i; j++) print lines[j]
+                                                           print C_OFF
+                                                           delete lines; i=0
+                                                         }
+                ' < "$TEST_OUTPUT_DIR/$test_func.asserts"
+        fi
+        echo "--- Captured stdout --------------------"
+        cat "$TEST_OUTPUT_DIR/$test_func.out"
+        echo "--- Captured stderr --------------------"
+        cat "$TEST_OUTPUT_DIR/$test_func.err"
+        echo "----------------------------------------"
+    done >&2
+}
 
 
 

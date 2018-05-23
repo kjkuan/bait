@@ -1,6 +1,10 @@
 #!/usr/bin/env bait -n
 #
 # vim: set ft=sh:
+#
+# Some test cases here will fail. This is on purpose.
+# This file is meant to be used by the test.sh in the same folder.
+#
 
 Case {
     : An empty test case without description.
@@ -18,7 +22,8 @@ Case "A test case with a few checks" {
 
     assert : a failing assert; false
 
-    assert date
+    echo hello >&2
+    assert true
 
     assert "a description for the assertion" {
         (( 24 < 42 ))
@@ -78,4 +83,12 @@ fixture2() { local data=fixture2data; }
 @setup fixture2
 Case "Test multiple fixture setups" {
     [[ $data == fixture?data ]]
+}
+
+Case "A dummy test case to be include/exlucded from CLI" {
+    echo dummy test 1
+}
+
+Case "Another dummy test case to be include/exlucded from CLI" {
+    echo dummy test 2
 }

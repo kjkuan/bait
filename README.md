@@ -42,37 +42,18 @@ t/example.t ..
 ok 1 - An Example Test Case Definition
 ok 2 - An Example Test Case Definition
 ok 3 - Another example with assert checks
----Test_1: An Example Test Case Definition 
-+ test_data1_hooked
-+ local data=42
-+ Test_1
-+ [[ 42 -ge 42 ]]
----Test_2: An Example Test Case Definition 
-+ test_data2_hooked
-+ local data=69
-+ Test_2
-+ [[ 69 -ge 42 ]]
----Test_3: Another example with assert checks 
-+ Test_3
-+ check
-+ assert
-+ ((  1 + 1 == 2  ))
-+ local rc=0
-+ check
-+ assert
-+ : Check if www.google.com is up
-+ local url=https://www.google.com/
-++ curl -I -L -sf -w '%{http_code}\n' https://www.google.com/
-++ tail -1
-+ [[ 200 == 200 ]]
-+ local rc=0
 ok
 All tests successful.
-Files=1, Tests=3,  1 wallclock secs ( 0.01 usr  0.00 sys +  0.04 cusr  0.02 csys =  0.07 CPU)
+Files=1, Tests=3,  0 wallclock secs ( 0.02 usr  0.00 sys +  0.05 cusr  0.03 csys =  0.10 CPU)
 Result: PASS
 ```
 
-For more examples, take a look at [bait.t](t/bait.t).
+See `bait -h` for useful CLI options.
+When run using `prove`, CLI options for `bait` can be passed after a `::`, like this:
+
+    $ prove -e bait t/example.t :: -t1,2         
+
+For examples test cases see the documentation below, and take a look at [bait.t](t/bait.t).
 
 
 Writing Tests
@@ -98,7 +79,7 @@ command. The whole thing usually looks like this:
     End Case   # Note: You can't nest test case defintions.
 
 Notice that this is all written in Bash, and your test case is just
-a Bash function defined by the `Do()` function. Also, note that if define the
+a Bash function defined by the `Do()` function. Also, note that if you define the
 `Do()` function using `(` and `)` instead of `{` and `}` for the body, then it
 will be run in a subshell, which might work better for you if you'd like better
 isolation between different test case runs.
@@ -125,9 +106,13 @@ and then you call `check` immediately after the functinon definition.
 The above example will run all three checks and result in a failed test case
 because the second assert check fails.
 
+Stdout and stderr of a test case are captured, and will be shown at the end of
+all tests runs along with failed asserts for the failed test cases.
+
 The advantage of defining your check in an `assert()` function like this is that
 you can put anything in it easily without messing with quotes. Plus, when a check
 fails, Bait will show the source code of its `assert()` function for you to see.
+
 
 Using SKIP and TODO
 ----------------------
