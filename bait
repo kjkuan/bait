@@ -109,6 +109,9 @@ STATE_REASON=;  # reason for the above state.
 TESTS=()        # A list of test case function names accumulated so far.
                 # These are candidates for bait_run_tests().
 
+EXIT_CMDS=()    # a list commands to run at script end.
+
+trap 'for cmd in "${EXIT_CMDS[@]}"; do $cmd; done' EXIT
 
 # Accumulate each `@setup` call's arguments for the current defining
 # test case.
@@ -312,7 +315,7 @@ TODO () {
 #
 bait_run_tests () {
     TEST_OUTPUT_DIR=$(mktemp -d tmp.XXXXXXXXXXXX) && 
-        trap "rm -rf $(printf "%q\n" "$TEST_OUTPUT_DIR")" EXIT \
+        EXIT_CMDS+=("rm -rf $(printf "%q\n" "$TEST_OUTPUT_DIR")") \
         || bait_die "Failed creating need temporary directory!"
 
     local test_func test_num case_desc target failed_tests=()
