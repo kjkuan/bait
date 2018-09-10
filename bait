@@ -314,7 +314,7 @@ TODO () {
 # Run the test cases, producing TAP style outputs.
 #
 bait_run_tests () {
-    TEST_OUTPUT_DIR=$(mktemp -d tmp.XXXXXXXXXXXX) && 
+    TEST_OUTPUT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXXXX") &&
         EXIT_CMDS+=("rm -rf $(printf "%q\n" "$TEST_OUTPUT_DIR")") \
         || bait_die "Failed creating need temporary directory!"
 
