@@ -77,7 +77,7 @@ bait_main () {
         src=$(_preprocess <<<"$src")
     fi
     if [[ ! ${no_run:-} ]]; then
-        exec "$BASH" <(
+        exec "$SHELL" <(
             printf "source %q; %s\n" "$0" "$src"
             echo "set +e; bait_run_tests"
         )
@@ -111,7 +111,7 @@ TESTS=()        # A list of test case function names accumulated so far.
 
 EXIT_CMDS=()    # a list commands to run at script end.
 
-trap 'for cmd in "${EXIT_CMDS[@]}"; do $cmd; done' EXIT
+trap 'for cmd in "${EXIT_CMDS[@]}"; do eval "$cmd"; done' EXIT
 
 # Accumulate each `@setup` call's arguments for the current defining
 # test case.
